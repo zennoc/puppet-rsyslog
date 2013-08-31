@@ -17,6 +17,7 @@ class rsyslog::params {
   ### Module specific varibale
   $mode = 'client'
   $syslog_server = ''
+  $syslog_server_port = '514'
 
   ### Application related parameters
 
@@ -71,7 +72,8 @@ class rsyslog::params {
   }
 
   $pid_file = $::operatingsystem ? {
-    default => '/var/run/rsyslog.pid',
+    /(?i:Debian|Ubuntu|Mint)/ => '/var/run/rsyslogd.pid',
+    default                   => '/var/run/rsyslog.pid',
   }
 
   $data_dir = $::operatingsystem ? {
@@ -95,6 +97,7 @@ class rsyslog::params {
   $source_dir = ''
   $source_dir_purge = false
   $template = ''
+  $content = ''
   $options = ''
   $service_autorestart = true
   $version = 'present'

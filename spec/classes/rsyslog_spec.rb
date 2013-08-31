@@ -19,7 +19,7 @@ describe 'rsyslog' do
   end
 
   describe 'Test standard installation with monitoring and firewalling' do
-    let(:params) { {:monitor => true , :firewall => true, :port => '42', :protocol => 'tcp' } }
+    let(:params) { {:monitor => true , :firewall => true, :port => '42', :protocol => 'udp' , :mode => 'server' } }
 
     it { should contain_package('rsyslog').with_ensure('present') }
     it { should contain_service('rsyslog').with_ensure('running') }
@@ -30,13 +30,13 @@ describe 'rsyslog' do
       content.should == true
     end
     it 'should place a firewall rule' do
-      content = catalogue.resource('firewall', 'rsyslog_tcp_42').send(:parameters)[:enable]
+      content = catalogue.resource('firewall', 'rsyslog_udp_42').send(:parameters)[:enable]
       content.should == true
     end
   end
 
   describe 'Test decommissioning - absent' do
-    let(:params) { {:absent => true, :monitor => true , :firewall => true, :port => '42', :protocol => 'tcp'} }
+    let(:params) { {:absent => true, :monitor => true , :firewall => true, :port => '42', :protocol => 'udp' , :mode => 'server' } }
 
     it 'should remove Package[rsyslog]' do should contain_package('rsyslog').with_ensure('absent') end 
     it 'should stop Service[rsyslog]' do should contain_service('rsyslog').with_ensure('stopped') end
@@ -47,13 +47,13 @@ describe 'rsyslog' do
       content.should == false
     end
     it 'should remove a firewall rule' do
-      content = catalogue.resource('firewall', 'rsyslog_tcp_42').send(:parameters)[:enable]
+      content = catalogue.resource('firewall', 'rsyslog_udp_42').send(:parameters)[:enable]
       content.should == false
     end
   end
 
   describe 'Test decommissioning - disable' do
-    let(:params) { {:disable => true, :monitor => true , :firewall => true, :port => '42', :protocol => 'tcp'} }
+    let(:params) { {:disable => true, :monitor => true , :firewall => true, :port => '42', :protocol => 'udp' , :mode => 'server' } }
 
     it { should contain_package('rsyslog').with_ensure('present') }
     it 'should stop Service[rsyslog]' do should contain_service('rsyslog').with_ensure('stopped') end
@@ -64,13 +64,13 @@ describe 'rsyslog' do
       content.should == false
     end
     it 'should remove a firewall rule' do
-      content = catalogue.resource('firewall', 'rsyslog_tcp_42').send(:parameters)[:enable]
+      content = catalogue.resource('firewall', 'rsyslog_udp_42').send(:parameters)[:enable]
       content.should == false
     end
   end
 
   describe 'Test decommissioning - disableboot' do
-    let(:params) { {:disableboot => true, :monitor => true , :firewall => true, :port => '42', :protocol => 'tcp'} }
+    let(:params) { {:disableboot => true, :monitor => true , :firewall => true, :port => '42', :protocol => 'udp' , :mode => 'server' } }
   
     it { should contain_package('rsyslog').with_ensure('present') }
     it { should_not contain_service('rsyslog').with_ensure('present') }
@@ -82,7 +82,7 @@ describe 'rsyslog' do
       content.should == false
     end
     it 'should keep a firewall rule' do
-      content = catalogue.resource('firewall', 'rsyslog_tcp_42').send(:parameters)[:enable]
+      content = catalogue.resource('firewall', 'rsyslog_udp_42').send(:parameters)[:enable]
       content.should == true
     end
   end 
@@ -99,6 +99,24 @@ describe 'rsyslog' do
       content.should match "value_a"
     end
 
+  end
+
+  describe 'Test customizations - content' do
+    let(:params) { {:content => "Rspec" } }
+
+    it 'should generate a valid template' do
+      content = catalogue.resource('file', 'rsyslog.conf').send(:parameters)[:content]
+      content.should match "Rspec"
+    end
+  end
+
+  describe 'Test customizations - template is preferred over content' do
+    let(:params) { {:content => "Rspec" , :template => "rsyslog/spec.erb" , :options => { 'opt_a' => 'value_a' } } }
+
+    it 'should generate a valid template' do
+      content = catalogue.resource('file', 'rsyslog.conf').send(:parameters)[:content]
+      content.should match "value_a"
+    end
   end
 
   describe 'Test customizations - source' do
@@ -126,11 +144,8 @@ describe 'rsyslog' do
     end
   end
 
-  describe 'Test service autorestart', :broken => true do
-    it 'should automatically restart the service, by default' do
-      content = catalogue.resource('file', 'rsyslog.conf').send(:parameters)[:notify]
-      content.should == 'Service[rsyslog]{:name=>"rsyslog"}'
-    end
+  describe 'Test service autorestart' do
+    it { should contain_file('rsyslog.conf').with_notify('Service[rsyslog]') }
   end
 
   describe 'Test service autorestart' do
@@ -161,23 +176,23 @@ describe 'rsyslog' do
   end
 
   describe 'Test Firewall Tools Integration' do
-    let(:params) { {:firewall => true, :firewall_tool => "iptables" , :protocol => "tcp" , :port => "42" } }
+    let(:params) { {:firewall => true, :firewall_tool => "iptables" , :protocol => "udp" , :port => "42" , :mode => 'server' } }
 
     it 'should generate correct firewall define' do
-      content = catalogue.resource('firewall', 'rsyslog_tcp_42').send(:parameters)[:tool]
+      content = catalogue.resource('firewall', 'rsyslog_udp_42').send(:parameters)[:tool]
       content.should == "iptables"
     end
   end
 
   describe 'Test OldGen Module Set Integration' do
-    let(:params) { {:monitor => "yes" , :monitor_tool => "puppi" , :firewall => "yes" , :firewall_tool => "iptables" , :puppi => "yes" , :port => "42" , :protocol => 'tcp' } }
+    let(:params) { {:monitor => "yes" , :monitor_tool => "puppi" , :firewall => "yes" , :firewall_tool => "iptables" , :puppi => "yes" , :port => "42" , :protocol => 'udp' , :mode => 'server' } }
 
     it 'should generate monitor resources' do
       content = catalogue.resource('monitor::process', 'rsyslog_process').send(:parameters)[:tool]
       content.should == "puppi"
     end
     it 'should generate firewall resources' do
-      content = catalogue.resource('firewall', 'rsyslog_tcp_42').send(:parameters)[:tool]
+      content = catalogue.resource('firewall', 'rsyslog_udp_42').send(:parameters)[:tool]
       content.should == "iptables"
     end
     it 'should generate puppi resources ' do 
@@ -218,7 +233,7 @@ describe 'rsyslog' do
 
   describe 'Test params lookup' do
     let(:facts) { { :monitor => false , :ipaddress => '10.42.42.42' } }
-    let(:params) { { :monitor => true , :firewall => true, :port => '42' } }
+    let(:params) { { :monitor => true , :firewall => true, :port => '42' , :mode => 'server' } }
 
     it 'should honour passed params over global vars' do
       content = catalogue.resource('monitor::process', 'rsyslog_process').send(:parameters)[:enable]
