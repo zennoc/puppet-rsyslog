@@ -8,7 +8,7 @@
 # Module specific variables
 # [*syslog_server*]
 #   Ip or hostname of a central syslog server. Note that in order to apply
-#   it you need a template that uses this $rsyslog::syslog_server variable 
+#   it you need a template that uses this $rsyslog::syslog_server variable
 #
 # [*mode*]
 #   Syslog server mode. If set to server it will bind to the syslog port
@@ -44,6 +44,13 @@
 #   If defined, rsyslog main config file has: content => content("$template")
 #   Note source and template parameters are mutually exclusive: don't use both
 #   Can be defined also by the (top scope) variable $rsyslog_template
+#
+# [*content*]
+#   Defines the content of the main configuration file, to be used as alternative
+#   to template when the content is populated on other ways.
+#   If defined, snmpd main config file has: content => $content
+#   Note: source, template and content are mutually exclusive.
+#   If a template is defined, that has precedence on the content parameter
 #
 # [*options*]
 #   An hash of custom options to be used in templates for arbitrary settings.
@@ -215,12 +222,14 @@
 #
 class rsyslog (
   $syslog_server       = params_lookup( 'syslog_server' ),
+  $syslog_server_port  = params_lookup( 'syslog_server_port' ),
   $mode                = params_lookup( 'mode' ),
   $my_class            = params_lookup( 'my_class' ),
   $source              = params_lookup( 'source' ),
   $source_dir          = params_lookup( 'source_dir' ),
   $source_dir_purge    = params_lookup( 'source_dir_purge' ),
   $template            = params_lookup( 'template' ),
+  $content             = params_lookup( 'content' ),
   $service_autorestart = params_lookup( 'service_autorestart' , 'global' ),
   $options             = params_lookup( 'options' ),
   $version             = params_lookup( 'version' ),
@@ -335,7 +344,10 @@ class rsyslog (
   }
 
   $manage_file_content = $rsyslog::template ? {
-    ''        => undef,
+    ''        => $rsyslog::content ? {
+      ''      => undef,
+      default => $rsyslog::content,
+    },
     default   => template($rsyslog::template),
   }
 
@@ -393,11 +405,14 @@ class rsyslog (
 
 
   ### Disable syslogd service where present by default
-  if $::osfamily == 'RedHat' and $::lsbmajdistrelease == '5' {
+  if $::osfamily == 'RedHat'
+  and $::lsbmajdistrelease == '5'
+  and ! defined(Service['syslog']) {
     service { 'syslog':
-      ensure => stopped,
-      enable => false,
-      before => Service['rsyslog'],
+      ensure    => stopped,
+      enable    => false,
+      hasstatus => true,
+      before    => Service['rsyslog'],
     }
   }
 
@@ -423,7 +438,7 @@ class rsyslog (
     }
   }
 
-  if ($rsyslog::mode == 'server') or ($rsyslog::syslog_server == $fqdn) {
+  if ($rsyslog::mode == 'server') or ($rsyslog::syslog_server == $::fqdn) {
     ### Service monitoring, if enabled ( monitor => true )
     if $rsyslog::bool_monitor == true {
       if $rsyslog::port != '' {
@@ -436,8 +451,8 @@ class rsyslog (
         }
       }
     }
-  
-  
+
+
     ### Firewall management, if enabled ( firewall => true )
     if $rsyslog::bool_firewall == true and $rsyslog::port != '' {
       firewall { "rsyslog_${rsyslog::protocol}_${rsyslog::port}":
